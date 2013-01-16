@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+
+################################################################################
+#                                                                              #
+#  paste-indt - simple bash script to upload a file to INdT's internal sticky  #
+#               notes (pastebin) instalation                                   #
+#                                                                              #
+#  Copyright (C) 2013 Sergio Correia <sergio.correia@openbossa.org>            #
+#                                                                              #
+#  paste-indt is free software; you can redistribute it and/or modify          #
+#  it under the terms of the GNU General Public License as published by        #
+#  the Free Software Foundation; either version 2 of the License, or           #
+#  (at your option) any later version.                                         #
+#                                                                              #
+#  paste-indt is distributed in the hope that it will be useful,               #
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of              #
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the               #
+#  GNU General Public License for more details.                                #
+#                                                                              #
+#  You should have received a copy of the GNU General Public License           #
+#  along with this program; if not, write to the Free Software                 #
+#  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA  #
+#                                                                              #
+################################################################################
+
+infile=${1}
+lang=${2}
+
+CURL=$(which curl 2>/dev/null)
+PERL=$(which perl 2>/dev/null)
+
+function check_external_dependencies() {
+    local variable=${1}
+    local program=${2}
+
+    if [ -z "${variable}" ]; then
+        echo "Please make sure you have '${program}' installed and available on the PATH."
+        exit
+    fi
+}
+
+function parse_arguments() {
+    if [ ! -f "${infile}" ]; then
+        echo "File '${infile}' was not found or cannot be accessed."
+        echo "Usage: $(basename ${0}) <file> [text|c|cpp|javascript|perl|php|python|ruby]"
+        exit
+    fi
+
+    if [ -z "${lang}" ]; then
+        lang="text"
+    fi
+}
+
+function problem() {
+    echo "It was not possible to create your paste from '${infile}'."
+    exit
+}
+
+function paste_it() {
+    local url="http://paste.indt.org"
+    local content=$(cat "${infile}" | ${PERL} -p -e 's/([^A-Za-z0-9])/sprintf("%%%02X", ord($1))/seg')
+    local data="paste_user=indt-paste-tool&paste_lang="${lang}"&paste_data="${content}"&paste_password=&paste_private=on&paste_submit=Paste&paste_expire=0"
+
+    local outfile="indt-paste-tool."${RANDOM}
+
+    ${CURL} -s -e "${url}" -d "${data}" "${url}" -D "${outfile}"
+
+    if [ -f "${outfile}" ]; then
+        local paste=$(cat "${outfile}" | grep Location | cut -d ":" -f 2 | tr -d ' ')
+        if [ -n "${paste}" ]; then
+            echo "http://paste.indt.org"${paste}
+        else
+            problem
+        fi
+        rm -f "${outfile}"
+    else
+        problem
+    fi
+}
+
+##
+
+check_external_dependencies "${CURL}" "curl"
+check_external_dependencies "${PERL}" "perl"
+
+parse_arguments
+
+paste_it
