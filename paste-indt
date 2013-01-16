@@ -2,8 +2,8 @@
 
 ################################################################################
 #                                                                              #
-#  paste-indt - simple bash script to upload a file to INdT's internal sticky  #
-#               notes (pastebin) instalation                                   #
+#  paste-indt - simple bash script to upload and download files to/from        #
+#               INdT's internal sticky notes (pastebin) instalation.           #
 #                                                                              #
 #  Copyright (C) 2013 Sergio Correia <sergio.correia@openbossa.org>            #
 #                                                                              #
@@ -23,8 +23,8 @@
 #                                                                              #
 ################################################################################
 
-infile=${1}
-lang=${2}
+infile="${1}"
+lang="${2}"
 
 CURL=$(which curl 2>/dev/null)
 PERL=$(which perl 2>/dev/null)
@@ -40,9 +40,8 @@ function check_external_dependencies() {
 }
 
 function parse_arguments() {
-    if [ ! -f "${infile}" ]; then
-        echo "File '${infile}' was not found or cannot be accessed."
-        echo "Usage: $(basename ${0}) <file> [text|c|cpp|javascript|perl|php|python|ruby]"
+    if [ -z "${infile}" ]; then
+        echo "Usage: $(basename ${0})  <file-to-upload|paste-id-to-download> [text|c|cpp|javascript|perl|php|python|ruby]"
         exit
     fi
 
@@ -78,11 +77,25 @@ function paste_it() {
     fi
 }
 
+function download_it() {
+    local paste="http://paste.indt.org/"${infile}"/raw/"
+    local outfile=$(echo "indt-paste-"${infile} | sed -e 's/\//_/g' | ${PERL} -pe 's/(_+)$//g')
+    ${CURL} -s -o /dev/stdout "${paste}" | tr -d '' > "${outfile}"
+}
+
+function do_it() {
+    check_external_dependencies "${CURL}" "curl"
+    check_external_dependencies "${PERL}" "perl"
+
+    parse_arguments
+
+    if [ -f "${infile}" ]; then
+        paste_it
+    else
+        download_it
+    fi
+}
+
 ##
 
-check_external_dependencies "${CURL}" "curl"
-check_external_dependencies "${PERL}" "perl"
-
-parse_arguments
-
-paste_it
+do_it
